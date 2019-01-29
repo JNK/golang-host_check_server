@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"flag"
+	"fmt"
 	"github.com/robfig/cron"
 	"io/ioutil"
 	"log"
@@ -34,8 +35,18 @@ func (ce *Config) UnmarshalJSON(b []byte) error {
 			return err
 		}
 
-		if m["type"] == "min-process-count" {
-			var p MinProcessCount
+		if m["type"] == "process-count-gte" {
+			var p ProcessCountGte
+			err := json.Unmarshal(*rawMessage, &p)
+			checkError(err)
+			ce.Checks[index] = &p
+		} else if m["type"] == "process-count-lte" {
+			var p ProcessCountLte
+			err := json.Unmarshal(*rawMessage, &p)
+			checkError(err)
+			ce.Checks[index] = &p
+		} else if m["type"] == "process-count-eq" {
+			var p ProcessCountEq
 			err := json.Unmarshal(*rawMessage, &p)
 			checkError(err)
 			ce.Checks[index] = &p
@@ -59,29 +70,39 @@ func (ce *Config) UnmarshalJSON(b []byte) error {
 var config = Config{}
 var healthy = false
 
-func handler(w http.ResponseWriter, r *http.Request) {
+func handler(writer http.ResponseWriter, request *http.Request) {
+	jsonResult := request.URL.Query()["json"] != nil
+
 	if healthy {
-		w.WriteHeader(200)
-		w.Write([]byte("OK\n"))
+		writer.WriteHeader(200)
+		if jsonResult {
+			_, _ = writer.Write([]byte("OK\n"))
+		} else {
+			_, _ = writer.Write([]byte("OK\n"))
+		}
 	} else {
-		w.WriteHeader(500)
-		w.Write([]byte("NOT OK\n"))
+		writer.WriteHeader(500)
+		if jsonResult {
+			_, _ = writer.Write([]byte("NOT OK\n"))
+		} else {
+			_, _ = writer.Write([]byte("NOT OK\n"))
+		}
 	}
 }
 
-var defaultCheckInterval int = 5
-var defaultConfigFile string = "/etc/check_health.json"
-var defaultHandlerPath string = "/health"
-var defaultServerExpose string = "0.0.0.0:2424"
+var defaultCheckInterval = 5
+var defaultConfigFile = "/etc/check_health.json"
+var defaultHandlerPath = "/health"
+var defaultServerExpose = "0.0.0.0:2424"
 
 func main() {
 	var checkInterval int
 	var configFilePath string
 	var handlerPath string
 	var hostDefinition string
-	flag.IntVar(&checkInterval, "i", 5, "number of seconds to run checks")
+	flag.IntVar(&checkInterval, "i", defaultCheckInterval, "number of seconds to run checks")
 	flag.StringVar(&configFilePath, "c", defaultConfigFile, "path to health check server config file")
-	flag.StringVar(&handlerPath, "l", defaultHandlerPath, "path to serve results at")
+	flag.StringVar(&handlerPath, "l", defaultHandlerPath, "root path to serve server at")
 	flag.StringVar(&hostDefinition, "e", defaultServerExpose, "how to expose server")
 	flag.Parse()
 
@@ -102,7 +123,8 @@ func main() {
 	checkError(err)
 
 	c := cron.New()
-	err = c.AddFunc("0/5 * * * * *", func() {
+	cronString := fmt.Sprintf("0/%v * * * * *", checkInterval)
+	err = c.AddFunc(cronString, func() {
 		healthy = CheckHealth(config)
 	})
 	checkError(err)

@@ -1,42 +1,43 @@
 package main
 
 import (
-	"log"
+	"fmt"
 	"os/exec"
 	"strings"
 	"syscall"
 )
 
 type ShellExitCode struct {
+	JobName string `json:"name"`
 	Command string `json:"command"`
-	Code int `json:"code"`
+	Code    int    `json:"code"`
 }
 
-func (a *ShellExitCode) Validate() bool {
+func (a *ShellExitCode) Validate() (bool, string) {
 	commands := strings.Split(a.Command, " ")
 	name, arguments := commands[0], commands[1:]
 	cmd := exec.Command(name, arguments...)
 
 	if err := cmd.Start(); err != nil {
-		log.Fatalf("error with cmd-exit-code \"%v\": %v", a.Command, err)
+		return false, fmt.Sprintf("error with cmd-exit-code \"%v\": %v", a.Command, err)
 	}
 
 	if err := cmd.Wait(); err != nil {
 		if exiterr, ok := err.(*exec.ExitError); ok {
-			// The program has exited with an exit code != 0
-
-			// This works on both Unix and Windows. Although package
-			// syscall is generally platform dependent, WaitStatus is
-			// defined for both Unix and Windows and in both cases has
-			// an ExitStatus() method with the same signature.
 			if status, ok := exiterr.Sys().(syscall.WaitStatus); ok {
-				return  status.ExitStatus() == a.Code
+				code := status.ExitStatus()
+				if code != a.Code {
+					return false, fmt.Sprintf("expected code: %v; got code: %s", a.Code, code)
+				}
 			}
 		} else {
-			log.Fatalf("cmd.Wait: %v", err)
+			return false, fmt.Sprintf("failed %s", err)
 		}
 	}
 
-	return true
+	return true, "success"
 }
 
+func (a *ShellExitCode) Name() string {
+	return a.JobName
+}

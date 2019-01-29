@@ -1,0 +1,28 @@
+{
+  "checks": [
+    {
+      "type": "process-count-gte",
+      "name": "un1",
+      "process": "mdworker",
+      "min": 1
+    },
+    {
+      "type": "process-count-lte",
+      "name": "un2",
+      "process": "mdworker",
+      "max": 10
+    },
+    {
+      "type": "cmd-exit-code",
+      "name": "un3",
+      "command": "./example/fun.sh",
+      "code": 123
+    },
+    {
+      "type": "cmd-result-regex",
+      "name": "un4",
+      "command": "./example/fun.sh",
+      "regex": "yay"
+    }
+  ]
+}
