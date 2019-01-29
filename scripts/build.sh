@@ -21,3 +21,4 @@ build darwin amd64 $HCS_VERSION
 
 build windows amd64 $HCS_VERSION
 
+chmod +x bin/*-host_check_server
